@@ -1,13 +1,8 @@
 import os
 from flask import Flask, request, jsonify
-import ptvsd
 from llm_api import LLM_API
 from flask_cors import CORS
-
-
-ptvsd.enable_attach(address=('0.0.0.0', 5678), redirect_output=True)
-print("Waiting for debugger to attach...")
-ptvsd.wait_for_attach()
+from flask_socketio import SocketIO
 
 
 app = Flask(__name__)
@@ -16,6 +11,17 @@ model_dir = './models'  # Replace with the path to your models directory
 api = LLM_API(model_dir)
 
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+if os.environ.get('DEBUG_MODE') == 'True':
+    import debugpy
+    debugpy.listen(("0.0.0.0", 5678))
+    print("Waiting for debugger to attach...")
+    debugpy.wait_for_client()
+
+def new_text_callback(text: str):
+    print(text, end="", flush=True)
+    socketio.emit('llm_output', text)
 
 def list_models():
     return [f for f in os.listdir(model_dir) if f.endswith('.bin')]
@@ -46,10 +52,11 @@ def generate():
     n_threads = data.get('n_threads', 8)
 
     try:
-        generated_text = api.generate_text(prompt, n_predict, n_threads)
+        generated_text = api.generate_text(prompt, n_predict, n_threads, new_text_callback=new_text_callback)
         return jsonify({"generated_text": generated_text})
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # app.run(host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000)

@@ -1,4 +1,7 @@
 Flask==2.1.1
 pyllamacpp
 flask-cors
-ptvsd==4.3.2
+debugpy
+Flask-SocketIO
+gunicorn==20.1.0
+eventlet==0.30.2
