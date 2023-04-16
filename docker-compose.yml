@@ -1,0 +1,10 @@
+version: '3.9'
+
+services:
+  llm_api:
+    build: .
+    ports:
+      - "5000:5000"
+      - "5678:5678"
+    volumes:
+      - ./models:/app/models
