@@ -1,9 +1,21 @@
 import os
+import io
+import sys
+import threading
 from flask import Flask, request, jsonify
 from llm_api import LLM_API
 from flask_cors import CORS
 from flask_socketio import SocketIO
 
+from gevent import pywsgi
+from geventwebsocket.handler import WebSocketHandler
+
+api_port = 5001
+websocket_port = 5000
+
+output_buffer = io.StringIO()
+sys.stdout = output_buffer
+sys.stderr = output_buffer
 
 app = Flask(__name__)
 
@@ -11,7 +23,7 @@ model_dir = './models'  # Replace with the path to your models directory
 api = LLM_API(model_dir)
 
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", engineio_logger=True)
 
 if os.environ.get('DEBUG_MODE') == 'True':
     import debugpy
@@ -57,6 +69,24 @@ def generate():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected:', request.sid)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected:', request.sid)
+
+def run_api_server():
+    api_server = pywsgi.WSGIServer(('0.0.0.0', api_port), app)
+    api_server.serve_forever()
+
 if __name__ == '__main__':
-    # app.run(host='0.0.0.0', port=5000)
-    socketio.run(app, host='0.0.0.0', port=5000)
+    api_server_thread = threading.Thread(target=run_api_server)
+    api_server_thread.start()
+
+    print("Starting WebSocket server...")
+    socketio.run(app, host='0.0.0.0', port=websocket_port, debug=False, use_reloader=False)
+    print("WebSocket server stopped.")
+
+

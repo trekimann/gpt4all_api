@@ -1,0 +1,5 @@
+Flask==2.1.1
+pyllamacpp
+flask-cors
+debugpy
+Flask-SocketIO
